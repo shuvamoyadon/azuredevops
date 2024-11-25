@@ -1,0 +1,55 @@
+trigger:
+- main
+
+pool:
+  name: Default
+
+variables:
+  RESOURCE_GROUP: "1-e6ae573a-playground-sandbox"
+  DATAFACTORY_NAME: "shuvaadf"
+  LINKED_SERVICE_NAME: "AzureBlobShuvaNew2"
+  KEYVAULT_LINKED_SERVICE_NAME: "mykey"
+
+steps:
+- checkout: self
+
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: "myserv"
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+      # Install the Azure Data Factory extension if not already installed
+      az extension add --name datafactory || echo "Data Factory extension already installed"
+
+      # Retrieve secrets from Key Vault
+      ACCOUNT_NAME_SECRET=$(az keyvault secret show --vault-name shuvakey123 --name "BlobAccountName" --query "value" -o tsv)
+      ACCOUNT_KEY_SECRET=$(az keyvault secret show --vault-name shuvakey123 --name "BlobAccountKey" --query "value" -o tsv)
+
+      # Escape special characters in secrets
+      ESCAPED_ACCOUNT_NAME_SECRET=$(printf '%s\n' "$ACCOUNT_NAME_SECRET" | sed 's/[&/\]/\\&/g')
+      ESCAPED_ACCOUNT_KEY_SECRET=$(printf '%s\n' "$ACCOUNT_KEY_SECRET" | sed 's/[&/\]/\\&/g')
+
+      # Replace placeholders in the JSON file
+      JSON_FILE="$(Build.SourcesDirectory)/linkedService/adf/blob_linked_service.json"
+      TEMP_JSON_FILE="$(Build.SourcesDirectory)/linkedService/adf/blob_linked_service_temp.json"
+
+      sed "s/PLACEHOLDER_KEYVAULT_LINKED_SERVICE_NAME/$KEYVAULT_LINKED_SERVICE_NAME/g" $JSON_FILE | \
+      sed "s/PLACEHOLDER_ACCOUNT_NAME_SECRET/$ESCAPED_ACCOUNT_NAME_SECRET/g" | \
+      sed "s/PLACEHOLDER_ACCOUNT_KEY_SECRET/$ESCAPED_ACCOUNT_KEY_SECRET/g" > $TEMP_JSON_FILE
+
+      # Validate JSON file
+      if ! jq empty $TEMP_JSON_FILE; then
+        echo "Error: Invalid JSON format in $TEMP_JSON_FILE"
+        exit 1
+      fi
+
+      # Deploy the Blob Storage linked service
+      az datafactory linked-service create \
+      --resource-group $RESOURCE_GROUP \
+      --factory-name $DATAFACTORY_NAME \
+      --linked-service-name $LINKED_SERVICE_NAME \
+      --properties @$TEMP_JSON_FILE
+
+      # Cleanup temporary file
+      rm $TEMP_JSON_FILE
