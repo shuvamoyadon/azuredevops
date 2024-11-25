@@ -1,0 +1,22 @@
+{
+    "type": "AzureBlobStorage",
+    "typeProperties": {
+        "accountName": {
+            "type": "AzureKeyVaultSecret",
+            "store": {
+                "referenceName": "PLACEHOLDER_KEYVAULT_LINKED_SERVICE_NAME",
+                "type": "LinkedServiceReference"
+            },
+            "secretName": "PLACEHOLDER_ACCOUNT_NAME_SECRET"
+        },
+        "accountKey": {
+            "type": "AzureKeyVaultSecret",
+            "store": {
+                "referenceName": "PLACEHOLDER_KEYVAULT_LINKED_SERVICE_NAME",
+                "type": "LinkedServiceReference"
+            },
+            "secretName": "PLACEHOLDER_ACCOUNT_KEY_SECRET"
+        }
+    }
+}
+
